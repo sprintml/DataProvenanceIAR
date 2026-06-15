@@ -180,15 +180,21 @@ python scripts/evaluate.py var --encoder original --baselines \
 
 ### 5. Robustness to post-processing (RAR / Taming)
 
+Robustness uses QuantLoss with the **augmentation-finetuned** encoder
+(`encoder_aug.pth`). Attacks are applied faithfully to the paper
+(`demo_ours.py`): open → squash to the model resolution → attack on the **PIL**
+image, with the Gaussian blur sampling a **random sigma in (0.1, 2.0)** per image.
+
 ```bash
-# all attacks at the paper's default strengths, using the augmentation-finetuned encoder
+# all attacks at the paper's default strengths, with the augmentation-finetuned encoder
 python scripts/robustness_eval.py rar --signal quant_loss \
-    --set finetuned_encoder=checkpoints/rar_aug/encoder_final.pth \
-    --belonging data/rar_generated --nonbelonging data/imagenet
+    --set finetuned_encoder=checkpoints/rar/encoder_aug.pth \
+    --belonging data/rar_generated --nonbelonging data/coco
 
 # sweep a single attack across its full strength range
 python scripts/robustness_eval.py rar --attacks jpeg --strength sweep \
-    --belonging data/rar_generated --nonbelonging data/imagenet
+    --set finetuned_encoder=checkpoints/rar/encoder_aug.pth \
+    --belonging data/rar_generated --nonbelonging data/coco
 ```
 
 Pre-materialize attacked datasets instead of attacking on the fly:
@@ -203,22 +209,29 @@ python scripts/make_augmented_data.py data/imagenet --attacks jpeg resize --stre
 ## Finetuned encoder checkpoints (HuggingFace)
 
 We release the finetuned inverse-decoder encoders as **full state dicts** in a
-single HuggingFace model repo with layout `<model>/encoder_final.pth`.
+single HuggingFace model repo:
 
-Download:
+```
+<model>/encoder_final.pth     # main-table inverse decoder (all 5 models)
+rar/encoder_aug.pth           # augmentation-finetuned encoder (robustness)
+taming/encoder_aug.pth        # augmentation-finetuned encoder (robustness)
+```
+
+Download and use:
 
 ```bash
 python scripts/download_checkpoints.py var --what encoder \
     --hf-repo <user>/dataprovenance-iar-encoders
 ```
 
-Upload (maintainers, after finetuning):
+Maintainers: `scripts/prep_release_checkpoint.py` converts an existing finetuned
+checkpoint into this format. A ready-to-upload folder (all seven files + a model
+card documenting each one's source) can be uploaded in one shot:
 
 ```bash
 huggingface-cli login
-python scripts/upload_checkpoints.py var \
-    --encoder-path checkpoints/var/encoder_final.pth \
-    --hf-repo <user>/dataprovenance-iar-encoders --create
+huggingface-cli upload <user>/dataprovenance-iar-encoders <folder> . --repo-type model
+# or per file:  python scripts/upload_checkpoints.py var --encoder-path ... --hf-repo ... --create
 ```
 
 ---

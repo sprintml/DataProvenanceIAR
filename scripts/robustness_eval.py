@@ -26,23 +26,40 @@ from typing import Dict, List
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
+import torchvision.transforms.functional as TF
+from PIL import Image
 from tqdm import tqdm
 
 from _common import build_from_args, add_common_args  # noqa: E402
 from dataprov import augmentations as A
 from dataprov import metrics, signals  # noqa: E402
-from dataprov.data import ImageFolder  # noqa: E402
+from dataprov.data import list_images  # noqa: E402
 
 
 def attacked_scores(model, folder, attack, strength, signal, batch_size, limit) -> np.ndarray:
-    ds = ImageFolder(folder, model.image_transform(), limit=limit)
-    loader = DataLoader(ds, batch_size=batch_size, num_workers=4, shuffle=False)
+    """Score a folder under one attack, faithfully to the paper (demo_ours.py):
+    open -> resize((S, S)) -> attack on the PIL image -> ToTensor -> encode.
+    """
+    paths = list_images(folder)
+    if limit is not None:
+        paths = paths[:limit]
+    size = model.image_size
     out: List[np.ndarray] = []
-    for img01 in loader:
-        att01 = A.apply_attack(img01, attack, strength) if attack != "none" else img01
-        native = model.to_model_range(att01.to(model.device))
-        out.append(signals.provenance_signals(model, native)[signal])
+    batch: List[torch.Tensor] = []
+
+    def flush() -> np.ndarray:
+        native = model.to_model_range(torch.stack(batch).to(model.device))
+        return signals.provenance_signals(model, native)[signal]
+
+    for p in paths:
+        img = Image.open(p).convert("RGB").resize((size, size))
+        img = A.apply_attack_pil(img, attack, strength, size)
+        batch.append(TF.to_tensor(img))
+        if len(batch) == batch_size:
+            out.append(flush())
+            batch = []
+    if batch:
+        out.append(flush())
     return np.concatenate(out)
 
 

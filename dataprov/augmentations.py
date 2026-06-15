@@ -36,6 +36,7 @@ __all__ = [
     "ATTACK_DEFAULTS",
     "ATTACK_RANGES",
     "apply_attack",
+    "apply_attack_pil",
     "AUG_SCHEDULE",
     "sample_train_augmentation",
 ]
@@ -161,6 +162,42 @@ def apply_attack(img01: torch.Tensor, name: str, strength: float) -> torch.Tenso
     if name not in ATTACKS:
         raise ValueError(f"Unknown attack '{name}'. Options: {list(ATTACKS)}")
     return ATTACKS[name](img01, strength)
+
+
+def apply_attack_pil(img: "Image.Image", name: str, strength: float, size: int) -> "Image.Image":
+    """PIL-image attack matching the paper's robustness eval (``demo_ours.py``).
+
+    The robustness pipeline opens an image, squashes it to ``(size, size)``,
+    applies the attack on the **PIL image**, then converts to a tensor -- which
+    differs slightly from applying the same op on a ``[0,1]`` tensor. Use this for
+    a bit-faithful reproduction of the robustness table.
+    """
+    import numpy as np
+    from torchvision import transforms as _T
+
+    if name == "none":
+        return img
+    if name == "noise":
+        arr = np.array(img).astype(np.float32)
+        arr = arr + np.random.normal(0.0, 255.0 * float(strength), arr.shape)
+        return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+    if name == "kernel":
+        return _T.GaussianBlur(int(strength))(img)               # random sigma (0.1, 2.0)
+    if name == "jpeg":
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=int(strength))
+        buf.seek(0)
+        return Image.open(buf).convert("RGB")
+    if name == "brightness":
+        return _T.ColorJitter(brightness=[float(strength)] * 2)(img)
+    if name == "contrast":
+        return _T.ColorJitter(contrast=[float(strength)] * 2)(img)
+    if name == "saturation":
+        return _T.ColorJitter(saturation=[float(strength)] * 2)(img)
+    if name == "resize":
+        s = max(1, int(float(strength) * size))
+        return img.resize((s, s)).resize((size, size))
+    raise ValueError(f"Unknown attack '{name}'. Options: {list(ATTACK_DEFAULTS)}")
 
 
 # --------------------------------------------------------------------------- #

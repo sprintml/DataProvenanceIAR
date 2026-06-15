@@ -50,7 +50,9 @@ pip install torch torchvision omegaconf timm && pip install -e .
 Base weights auto-download: tokenizer from `fun-research/TiTok`
 (`maskgit-vqgan-imagenet-f16-256.bin`), generator from `yucornetto/RAR`
 (`rar_xxl.bin`). RAR needs inverse-decoder finetuning, and supports robustness
-finetuning (`--augment`) + `scripts/robustness_eval.py`.
+finetuning (`--augment`) + `scripts/robustness_eval.py`. For the robustness table
+use the **augmentation-finetuned** encoder (`rar/encoder_aug.pth`, the
+`aug552020_conserv` recipe), not the clean `encoder_final.pth`.
 
 ## VAR
 
