@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dataprov-iar"
+version = "0.1.0"
+description = "Data Provenance for Image Auto-Regressive Generation"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Bihe Zhao" }]
+dependencies = [
+    "torch>=2.2",
+    "torchvision>=0.17",
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "scikit-learn>=1.2",
+    "pyyaml>=6.0",
+    "pillow>=9.5",
+    "tqdm>=4.65",
+    "huggingface_hub>=0.23",
+]
+
+[project.optional-dependencies]
+lpips = ["lpips>=0.1.4"]
+
+[tool.setuptools.packages.find]
+include = ["dataprov*"]

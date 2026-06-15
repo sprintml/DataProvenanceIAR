@@ -1,0 +1,157 @@
+"""Abstract interface that every IAR (image auto-regressive) model implements.
+
+The whole provenance framework is written against this small interface, so the
+signal/finetuning/evaluation code is identical across LlamaGen, RAR, VAR,
+Taming and Infinity. A concrete subclass only has to wire its own tokenizer
+(encoder + quantizer + decoder) and autoregressive generator.
+
+Key method
+----------
+``img_to_reconstructed_img(images, use_quant)`` returns the tuple
+``(rec_img, tokens, f, fhat)`` where
+
+* ``f``    : the continuous feature map produced by the (inverse) decoder,
+             i.e. ``f = D^{-1}(image)``  (encoder output, pre-quantization).
+* ``fhat`` : the quantized feature map ``f_Z`` (``use_quant=True``) or simply
+             ``f`` again (``use_quant=False``).
+* ``rec_img``: the image decoded from ``fhat``.
+* ``tokens``: the discrete token map (or ``None`` when ``use_quant=False``).
+
+From this single primitive we derive every provenance signal (see
+``dataprov.signals``).
+"""
+
+from __future__ import annotations
+
+from typing import List, Optional, Tuple
+
+import torch
+from torch import Tensor
+from torch import nn
+
+__all__ = ["BaseIAR"]
+
+
+class BaseIAR(nn.Module):
+    #: Side length (px) the model encodes at.
+    image_size: int = 256
+    #: Pixel range the model's encoder/decoder operate in: "pm1" = [-1, 1], "01" = [0, 1].
+    value_range: str = "pm1"
+    #: Short identifier, e.g. "var", "rar".
+    name: str = "base"
+
+    def __init__(self, cfg, device: str = "cuda"):
+        super().__init__()
+        self.cfg = cfg
+        self.device = device
+        self.image_size = int(cfg.get("image_size", self.image_size))
+        self.value_range = str(cfg.get("value_range", self.value_range))
+        self.tokenizer, self.generator = self.load_models()
+
+    # ------------------------------------------------------------------ #
+    # Construction
+    # ------------------------------------------------------------------ #
+    def load_models(self) -> Tuple[nn.Module, Optional[nn.Module]]:
+        """Build and return ``(tokenizer, generator)``.
+
+        ``tokenizer`` (the autoencoder: encoder + quantizer + decoder) is
+        required for provenance. ``generator`` (the AR transformer) is only
+        needed to *generate* the belonging / finetuning data and may be ``None``
+        when running evaluation against pre-generated images.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------ #
+    # Core provenance primitive
+    # ------------------------------------------------------------------ #
+    @torch.no_grad()
+    def img_to_reconstructed_img(
+        self, images: Tensor, use_quant: bool = True
+    ) -> Tuple[Tensor, Optional[List[Tensor]], Tensor, Tensor]:
+        """Encode then decode ``images`` (in the model's native range).
+
+        Returns ``(rec_img, tokens, f, fhat)`` as documented in the module
+        docstring.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------ #
+    # Finetuning hooks (encoder -> inverse decoder)
+    # ------------------------------------------------------------------ #
+    def encode_feature(self, images: Tensor) -> Tensor:
+        """Continuous feature ``f = D^{-1}(image)`` used as the finetuning prediction.
+
+        Must be differentiable w.r.t. the trainable encoder parameters and match
+        the convention of ``finetune_targets`` for this model.
+        """
+        raise NotImplementedError
+
+    def trainable_encoder_modules(self) -> List[nn.Module]:
+        """Modules whose parameters are optimized during inverse-decoder finetuning."""
+        raise NotImplementedError
+
+    def decode_feature(self, f: Tensor) -> Tensor:
+        """Differentiable decode of a feature map to image space.
+
+        Only required for the LatentTracer baseline, which optimizes a latent to
+        minimize reconstruction error.
+        """
+        raise NotImplementedError
+
+    def encoder_state_dict(self) -> dict:
+        """State dict of the (finetuned) encoder, for saving/HF upload."""
+        sd: dict = {}
+        for i, m in enumerate(self.trainable_encoder_modules()):
+            for k, v in m.state_dict().items():
+                sd[f"module{i}.{k}"] = v
+        return sd
+
+    def load_encoder_state_dict(self, sd: dict) -> None:
+        """Inverse of :meth:`encoder_state_dict`."""
+        for i, m in enumerate(self.trainable_encoder_modules()):
+            prefix = f"module{i}."
+            sub = {k[len(prefix):]: v for k, v in sd.items() if k.startswith(prefix)}
+            m.load_state_dict(sub)
+
+    # ------------------------------------------------------------------ #
+    # Data generation
+    # ------------------------------------------------------------------ #
+    @torch.no_grad()
+    def generate(self, n: int, batch_size: int, seed: int, **gen_kwargs):
+        """Yield ``(images01, target_fZ)`` batches generated by the AR model.
+
+        ``images01`` are decoded images in ``[0, 1]`` (ready to save as PNG);
+        ``target_fZ`` is the quantized feature map the tokens were sampled from,
+        saved as the finetuning target for :meth:`encode_feature`.
+        """
+        raise NotImplementedError
+
+    # ------------------------------------------------------------------ #
+    # Preprocessing
+    # ------------------------------------------------------------------ #
+    def image_transform(self):
+        """Return a callable ``PIL.Image -> Tensor`` in ``[0, 1]`` at ``image_size``.
+
+        Default is resize (shorter side) + center crop + ToTensor. Models that
+        need a different interpolation or resize ratio override this.
+        """
+        from torchvision import transforms
+
+        return transforms.Compose(
+            [
+                transforms.Resize(self.image_size, antialias=True),
+                transforms.CenterCrop(self.image_size),
+                transforms.ToTensor(),
+            ]
+        )
+
+    # ------------------------------------------------------------------ #
+    # Range helpers
+    # ------------------------------------------------------------------ #
+    def to_model_range(self, img01: Tensor) -> Tensor:
+        """Map ``[0, 1]`` images to the model's native range."""
+        return img01 * 2.0 - 1.0 if self.value_range == "pm1" else img01
+
+    def to_unit_range(self, img: Tensor) -> Tensor:
+        """Map images in the model's native range back to ``[0, 1]``."""
+        return (img + 1.0) / 2.0 if self.value_range == "pm1" else img

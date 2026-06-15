@@ -1,0 +1,47 @@
+# RAR -- randomized-order autoregressive IAR (Yu et al., 2024). Single-scale.
+# Supports optional augmentation finetuning + robustness evaluation.
+name: rar
+model: rar
+image_size: 256
+value_range: "01"                      # MaskGIT-VQGAN tokenizer operates in [0, 1]
+
+# --- base weights (auto-downloaded from HuggingFace) ---
+tokenizer_repo: fun-research/TiTok
+tokenizer_ckpt: maskgit-vqgan-imagenet-f16-256.bin
+ar_repo: yucornetto/RAR
+ar_ckpt: rar_xxl.bin
+
+# --- generator architecture (rar_xxl) ---
+model_size: rar_xxl
+hidden_size: 1408
+num_hidden_layers: 40
+num_attention_heads: 16
+intermediate_size: 6144
+
+token_optim: false                     # single-scale -> plain nearest-neighbour quant
+
+# --- generation ---
+batch_size: 8
+guidance_scale: 4.0
+temperature: 1.0
+num_sample_steps: 8
+
+# --- encoder selection for evaluation ---
+encoder: finetuned
+hf_encoder_repo: ""
+# finetuned_encoder: /abs/path/encoder_final.pth
+
+# --- inverse-decoder finetuning ---
+finetune:
+  epochs: 50
+  batch_size: 8
+  lr: 5.0e-4
+  optimizer: adam
+  feat_weight: 1.0
+  img_weight: 0.0
+  lpips_weight: 0.0
+  scheduler: {name: steplr, step_size: 2, gamma: 0.9}
+  num_workers: 4
+  # progressive augmentation schedule for robustness finetuning (--augment):
+  # None(ep 1-5) -> Weak(6-10) -> Medium(11-30) -> Strong(31-50).
+  aug_schedule: [[none, 5], [weak, 5], [medium, 20], [strong, 20]]

@@ -1,0 +1,11 @@
+{
+    "LAION": "/storage1/datasets/laion_1k_clean",
+    "MS-COCO": "/storage1/datasets/mscoco2014val/val2014_subset",
+    "ImageNet (val)": "/storage3/bihe/dataset/imagenet256_eval",
+    "RAR Generated": "/storage1/freewatermark/rar/rar_xl_dec_original_generated",
+    "VAR Generated": "/storage1/freewatermark/var/var_generated",
+    "LlamaGen Generated": "/storage1/freewatermark/llamagen/256x256",
+    "Taming Generated": "/storage1/freewatermark/taming/taming_gen_images_original_decoder/images",
+    "Infinity Generated": "/storage2/water_inf/encoder_robustness/infinity/infinity_2b/delta_0",
+    "vqdiff": "/storage1/freewatermark/vqdiff"
+}

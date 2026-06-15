@@ -1,0 +1,31 @@
+# Checkpoints and data (downloaded / generated; never committed)
+checkpoints/
+data/
+outputs/
+*.pth
+*.pt
+*.bin
+*.ckpt
+*.safetensors
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Notebooks / editor
+.ipynb_checkpoints/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Allow small sample assets used by the smoke test
+!assets/**

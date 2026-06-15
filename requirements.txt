@@ -1,0 +1,21 @@
+# Core framework dependencies (Python >= 3.10).
+# Install with:  pip install -r requirements.txt
+#
+# PyTorch: install the build matching your CUDA from https://pytorch.org first,
+# e.g.  pip install torch==2.7.0 torchvision --index-url https://download.pytorch.org/whl/cu125
+torch>=2.2
+torchvision>=0.17
+numpy>=1.24
+scipy>=1.10
+scikit-learn>=1.2
+pyyaml>=6.0
+pillow>=9.5
+tqdm>=4.65
+huggingface_hub>=0.23
+
+# Optional, only needed for some per-model finetuning objectives (e.g. VAR with LPIPS weight > 0)
+# lpips>=0.1.4
+
+# Each model's vendored upstream code (third_party/<model>/) needs its own extra
+# packages and is best run in its own conda env (torch versions differ across
+# models). See docs/MODELS.md for the exact per-model setup.

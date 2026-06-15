@@ -1,0 +1,47 @@
+# Taming Transformers -- next-token prediction IAR (Esser et al., 2021).
+# Single-scale VQGAN. Supports augmentation finetuning + robustness evaluation.
+#
+# NOTE: Taming weights are NOT on HuggingFace; download them manually (see
+# docs/MODELS.md) and point the paths below at the local checkpoints.
+name: taming
+model: taming
+image_size: 256
+value_range: pm1
+
+# --- base weights (manual download; absolute paths or under checkpoints/taming) ---
+# Directory laid out as the official 'cin_transformer' release:
+#   <model_dir>/configs/net2net.yaml
+#   <model_dir>/checkpoints/net2net.ckpt   (transformer)
+#   <model_dir>/checkpoints/vqgan.ckpt     (VQGAN, f=16, 16384)
+model_dir: ""                          # e.g. checkpoints/taming/2021-04-03T19-39-50_cin_transformer
+config_path: ""                        # default: <model_dir>/configs/net2net.yaml
+ckpt_path: ""                          # default: <model_dir>/checkpoints/net2net.ckpt
+
+codebook_size: 16384
+codes_size: 16                         # 16x16 tokens per 256x256 image
+
+token_optim: false
+
+# --- generation ---
+batch_size: 8
+temperature: 1.0
+top_k: 250
+top_p: 0.92
+
+# --- encoder selection for evaluation ---
+encoder: finetuned
+hf_encoder_repo: ""
+# finetuned_encoder: /abs/path/encoder_final.pth
+
+# --- inverse-decoder finetuning ---
+finetune:
+  epochs: 50
+  batch_size: 8
+  lr: 5.0e-4
+  optimizer: adam
+  feat_weight: 1.0
+  img_weight: 0.0
+  lpips_weight: 0.0
+  scheduler: {name: steplr, step_size: 2, gamma: 0.9}
+  num_workers: 4
+  aug_schedule: [[none, 5], [weak, 5], [medium, 20], [strong, 20]]

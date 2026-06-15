@@ -1,0 +1,47 @@
+# LlamaGen -- next-token prediction IAR (Sun et al., 2024). Single-scale.
+name: llamagen
+model: llamagen
+image_size: 384
+value_range: pm1
+
+# --- base weights (auto-downloaded from HuggingFace) ---
+hf_repo: FoundationVision/LlamaGen
+vq_ckpt: vq_ds16_c2i.pt                # tokenizer
+gpt_ckpt: c2i_XL_384.pt                # autoregressive generator
+
+# --- tokenizer / generator architecture ---
+vq_model: VQ-16
+codebook_size: 16384
+codebook_embed_dim: 8
+gpt_model: GPT-XL
+gpt_type: c2i
+num_classes: 1000
+cls_token_num: 1
+downsample_size: 16
+
+token_optim: false
+
+# --- generation ---
+batch_size: 8
+cfg_scale: 4.0
+top_k: 0
+top_p: 1.0
+temperature: 1.0
+
+# --- encoder selection for evaluation ---
+encoder: finetuned
+hf_encoder_repo: ""
+# finetuned_encoder: /abs/path/encoder_final.pth
+
+# --- inverse-decoder finetuning ---
+finetune:
+  epochs: 25
+  batch_size: 8
+  lr: 1.0e-5
+  optimizer: adam
+  betas: [0.9, 0.95]
+  feat_weight: 1.0
+  img_weight: 0.0
+  lpips_weight: 0.0
+  scheduler: {name: steplr, step_size: 2, gamma: 0.9}
+  num_workers: 4

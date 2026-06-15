@@ -1,0 +1,54 @@
+# VAR -- next-scale prediction IAR (Tian et al., 2024).
+# Multi-scale; uses the OPTIMIZED quantization (gradient-descent token search)
+# for QuantLoss, which is its key distinguishing feature.
+name: var
+model: var
+image_size: 256
+value_range: pm1                       # encoder/decoder operate in [-1, 1]
+
+# --- base weights (auto-downloaded from HuggingFace) ---
+hf_repo: FoundationVision/var
+vae_ckpt: vae_ch160v4096z32.pth        # tokenizer (encoder + quantizer + decoder)
+ar_ckpt: var_d30.pth                   # autoregressive generator (depth 30)
+
+# --- tokenizer / generator architecture ---
+V: 4096
+Cvae: 32
+ch: 160
+share_quant_resi: 4
+patch_nums: [1, 2, 3, 4, 5, 6, 8, 10, 13, 16]
+depth: 30
+num_classes: 1000
+
+# --- optimized quantization (multi-scale token search) ---
+# Total iterations = optim_iter x (1 + (9 - optim_stop_scale)) = 200 x 6 = 1200,
+# matching the paper. Set token_optim=false to use VAR's original greedy quant.
+token_optim: true
+optim_iter: 200
+optim_lr: 0.1
+optim_tau_start: 2.0
+optim_tau_end: 0.5
+optim_stop_scale: 4
+
+# --- generation (for belonging + finetuning data) ---
+batch_size: 8
+cfg_scale: 4.0
+top_k: 900
+top_p: 0.96
+
+# --- encoder selection for evaluation ---
+encoder: finetuned                     # 'original' reproduces baselines
+hf_encoder_repo: ""                    # set to your released HF repo to auto-download
+# finetuned_encoder: /abs/path/encoder_final.pth   # optional explicit override
+
+# --- inverse-decoder finetuning ---
+finetune:
+  epochs: 10
+  batch_size: 16
+  lr: 5.0e-5
+  optimizer: adam
+  feat_weight: 1.0                     # || f_Z - encode(D(f_Z)) ||
+  img_weight: 0.0
+  lpips_weight: 0.0
+  scheduler: {name: steplr, step_size: 2, gamma: 0.9}
+  num_workers: 4
