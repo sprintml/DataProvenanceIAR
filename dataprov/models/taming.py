@@ -66,7 +66,13 @@ class TamingIAR(BaseIAR):
 
         cfg_path = self._path("net2net_config", "configs/net2net.yaml")
         ckpt_path = self._path("net2net_ckpt", "checkpoints/net2net.ckpt")
-        net = instantiate_from_config(OmegaConf.load(cfg_path).model)
+        netcfg = OmegaConf.load(cfg_path)
+        # Stub any nested training losses (first/cond-stage VQModels) for inference.
+        for sub in ("first_stage_config", "cond_stage_config"):
+            node = netcfg.model.params.get(sub, None) if "params" in netcfg.model else None
+            if node and "params" in node and "lossconfig" in node.params:
+                node.params.lossconfig = OmegaConf.create({"target": "torch.nn.Identity"})
+        net = instantiate_from_config(netcfg.model)
         sd = torch.load(ckpt_path, map_location="cpu", weights_only=False)
         net.load_state_dict(sd.get("state_dict", sd))
         net.eval().to(self.device)
@@ -105,16 +111,17 @@ class TamingIAR(BaseIAR):
         from deps.taming.modules.transformer.mingpt import sample_with_past  # vendored
 
         vq = self.tokenizer
-        steps = int(self.cfg.get("codes_size", 16)) ** 2
+        cs = int(self.cfg.get("codes_size", 16))
+        c = int(self.cfg.get("dim_z", 256))
         for start in range(0, n, batch_size):
             b = min(batch_size, n - start)
             g = torch.Generator(device=self.device).manual_seed(seed + start)
+            # The class index is passed straight to the transformer as conditioning.
             labels = torch.randint(0, 1000, (b, 1), generator=g, device=self.device)
-            c_indices = net.cond_stage_model.encode(labels) if hasattr(net, "cond_stage_model") else labels
-            codes = sample_with_past(c_indices, net.transformer, steps=steps,
+            codes = sample_with_past(labels, net.transformer, steps=cs * cs,
                                      sample_logits=True, temperature=float(temperature),
                                      top_k=int(top_k), top_p=float(top_p))
-            qzshape = [b, int(self.cfg.get("dim_z", 256)), 16, 16]
-            z_q = vq.quantize.get_codebook_entry(codes.reshape(-1), shape=qzshape)
+            index = net.permuter(codes, reverse=True)  # undo the transformer ordering
+            z_q = vq.quantize.get_codebook_entry(index.reshape(-1), shape=(b, cs, cs, c))
             img = vq.decoder(vq.post_quant_conv(z_q)).clamp(-1, 1)
             yield ((img + 1) / 2).cpu(), z_q.cpu()
