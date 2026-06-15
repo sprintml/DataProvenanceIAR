@@ -40,9 +40,8 @@ and **robustness evaluation** against common image post-processing.
 
 Notes: LlamaGen's *original* encoder is already a good inverse decoder (it
 reaches ~100% without finetuning, so use `--encoder original`); Infinity's
-strongest signal is QuantLoss with the finetuned encoder, and its generation
-(transformer + FLAN-T5) is not wired in this minimal release (evaluate/finetune
-against pre-generated images). See [docs/MODELS.md](docs/MODELS.md).
+strongest signal is QuantLoss with the finetuned encoder, and its generation is
+text-to-image (Infinity transformer + FLAN-T5). See [docs/MODELS.md](docs/MODELS.md).
 
 Baselines included: **Reconstruction**, **AEDR** (both = a signal computed with
 the *original* encoder, via `--encoder original`), and **LatentTracer**

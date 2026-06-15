@@ -20,9 +20,23 @@ h_div_w_template: 1.000
 
 token_optim: false
 
-# --- generation ---
-batch_size: 2
+# --- generation (text-to-image: Infinity transformer + FLAN-T5) ---
+# Generation loads the AR transformer (model_path) and the text encoder; set both
+# and provide prompts via `prompt_file` (one prompt per line; defaults to a small
+# built-in set otherwise). These match the official infinity_2b inference config.
+batch_size: 1                          # one image per prompt
 cfg_scale: 3.0
+tau: 1.0
+top_p: 0.97
+cfg_insertion_layer: 0
+sampling_per_bits: 1
+text_channels: 2048                    # FLAN-T5-XL hidden size
+use_bit_label: 1
+add_lvl_embeding_only_first_block: 1
+rope2d_each_sa_layer: 1
+rope2d_normalized_by_hw: 2
+bf16: 1
+prompt_file: ""                        # txt file of prompts (one per line)
 
 # --- encoder selection for evaluation ---
 encoder: finetuned

@@ -15,7 +15,7 @@ per-model environments below already include.
 | RAR | ≥2.5 | `omegaconf`, `timm` | HuggingFace (auto) | ✅ wired |
 | VAR | ≥2.2 | – | HuggingFace (auto) | ✅ wired |
 | Taming | ≥2.5 | `omegaconf` | manual download | ✅ wired (net2net) |
-| Infinity | ≥2.5 | `omegaconf` | official release | ⚠️ eval/finetune only |
+| Infinity | ≥2.5 | `omegaconf`, `transformers` | official release | ✅ wired (text-to-image) |
 
 After creating an environment, install the framework with `pip install -e .`.
 
@@ -105,9 +105,17 @@ python scripts/evaluate.py infinity --signals quant_loss --set vae_path=<infinit
 ```
 
 Infinity's strongest signal is **QuantLoss** with the finetuned encoder. Eval and
-finetuning need only the VAE; **generation (transformer + FLAN-T5) is not wired**
-in this minimal release — produce belonging images with the official Infinity
-repo, or evaluate against pre-generated Infinity images.
+finetuning need only the VAE. Generation is **text-to-image**: set `model_path`
+(the 2B transformer) and `text_encoder` (a FLAN-T5-XL path), then
+
+```bash
+python scripts/generate_data.py infinity --n 1000 --out data/infinity_generated \
+    --set vae_path=<vae> model_path=<infinity_2b_reg.pth> \
+          text_encoder=<flan-t5-xl> prompt_file=<prompts.txt>
+```
+
+One image is generated per prompt (`prompt_file`, one per line; a small built-in
+prompt set is used if omitted). Requires `transformers` for FLAN-T5.
 
 ---
 
