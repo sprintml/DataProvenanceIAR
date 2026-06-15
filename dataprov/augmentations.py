@@ -74,13 +74,19 @@ def jpeg(img: torch.Tensor, quality: int) -> torch.Tensor:
 
 @_batched
 def gaussian_blur(img: torch.Tensor, kernel_size: int) -> torch.Tensor:
-    """Gaussian blur with an odd kernel size (0 = identity)."""
+    """Gaussian blur with an odd kernel size (0 = identity).
+
+    Matches the paper's attack (``torchvision.transforms.GaussianBlur(kernel_size)``),
+    which samples the sigma uniformly from ``(0.1, 2.0)`` per image -- not a fixed
+    sigma. This randomness is part of the benchmark; set a seed for repeatability.
+    """
     kernel_size = int(kernel_size)
     if kernel_size <= 0:
         return img
     if kernel_size % 2 == 0:
         kernel_size += 1
-    return TF.gaussian_blur(img, kernel_size).clamp(0, 1)
+    sigma = float(torch.empty(1).uniform_(0.1, 2.0).item())
+    return TF.gaussian_blur(img, kernel_size, sigma=sigma).clamp(0, 1)
 
 
 @_batched
